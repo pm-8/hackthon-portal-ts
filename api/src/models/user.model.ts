@@ -10,7 +10,7 @@ export interface IUser extends Document {
   createdAt: Date;
   updatedAt: Date;
 }
-enum UserRole {
+export enum UserRole {
     HACKER = 'hacker',
     MENTOR = 'mentor',
     ADMIN = 'admin'
