@@ -1,9 +1,9 @@
-import { Request, Response } from 'express';
-import Team from '../models/team.model';
-import User from '../models/user.model';
-import Commit from '../models/commit.model';
-import { createWebhook } from '../utils/github.util';
-import { AuthRequest } from '../middlewares/auth.middleware'; // To access req.user
+import { type Request, type Response } from 'express';
+import Team from '../models/team.model.js';
+// import User from '../models/user.model.js';
+import Commit from '../models/commit.model.js';
+import { createWebhook } from '../utils/github.util.js';
+import { type AuthRequest } from '../middleware/auth.middleware.js'; // To access req.user
 
 // --- Create Team ---
 export const createTeam = async (req: AuthRequest, res: Response) => {
