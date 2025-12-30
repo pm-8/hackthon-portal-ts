@@ -6,17 +6,24 @@ import { createWebhook } from '../utils/github.util.js';
 import { type AuthRequest } from '../middleware/auth.middleware.js'; 
 export const createTeam = async (req: AuthRequest, res: Response) => {
   try {
-    const { teamName, githubRepo, teamMembers } = req.body;
-    const userId = req.user?.id; 
+    const { teamName, githubRepo } = req.body; 
+    console.log(req.user);// Removed teamMembers from body (security)
+    // const userId = req.user!.id;
+    const userId = req.user?.id;
     const newTeam = await Team.create({
       teamName,
       teamLeader: new Types.ObjectId(userId),
-      teamMembers: [new Types.ObjectId(userId)],
+      teamMembers: [new Types.ObjectId(userId)], // Store just the ID
       githubRepo
     });
+
     if (githubRepo) {
        await createWebhook(githubRepo, newTeam._id.toString());
     }
+
+    // FIX: Fetch the full user details (username, email) before sending response
+    await newTeam.populate('teamMembers', 'fullName email githubUsername');
+
     res.status(201).json(newTeam);
   } catch (error) {
     console.error('Create Team Error:', error);
@@ -52,6 +59,26 @@ export const getTeam = async (req: Request, res: Response) => {
     res.status(200).json({ team, commits });
   } catch (error) {
     console.error('Get Team Error:', error);
+    res.status(500).json({ error: 'Failed to fetch team' });
+  }
+};
+export const getMyTeam = async (req: AuthRequest, res: Response) => {
+  try {
+    // 2. Use '!' to tell TypeScript we are sure the user is logged in
+    const userId = req.user!.id; 
+    
+    // 3. Convert the string userId to a real ObjectId for the query
+    const team = await Team.findOne({ 
+      teamMembers: new Types.ObjectId(userId) 
+    });
+    
+    if (!team) {
+      return res.status(200).json(null);
+    }
+
+    res.status(200).json(team);
+  } catch (error) {
+    console.error('Get My Team Error:', error);
     res.status(500).json({ error: 'Failed to fetch team' });
   }
 };
