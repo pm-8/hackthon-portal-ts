@@ -8,7 +8,7 @@ const startServer = async () => {
     await connectDB();
     app.listen(PORT, () => {
       console.log(`\n===================================`);
-      console.log(`🚀 Server is running on port ${PORT}`);
+      console.log(`Server is running on port ${PORT}`);
       console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`===================================\n`);
     });

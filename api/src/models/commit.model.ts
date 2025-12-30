@@ -1,5 +1,4 @@
 import mongoose, { Schema, Document, Types } from 'mongoose';
-
 export interface ICommit extends Document {
   teamId: Types.ObjectId;
   commitId: string;
@@ -12,7 +11,6 @@ export interface ICommit extends Document {
   createdAt: Date;
   updatedAt: Date;
 }
-
 const commitSchema: Schema = new Schema<ICommit>(
   {
     teamId: {
@@ -51,6 +49,5 @@ const commitSchema: Schema = new Schema<ICommit>(
   },
   { timestamps: true }
 );
-
 const Commit = mongoose.model<ICommit>('Commit', commitSchema);
 export default Commit;

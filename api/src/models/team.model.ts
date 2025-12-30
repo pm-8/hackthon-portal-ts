@@ -1,27 +1,29 @@
 import mongoose, { Schema, Document, Types } from 'mongoose';
-
 export interface ITeam extends Document {
   teamName: string;
-  teamMembers: string[]; // Changed from generic 'Array' to 'string[]' for better safety
-  teamLeader: string;
+  teamMembers: Types.ObjectId[]; 
+  teamLeader: Types.ObjectId;
   githubRepo: string;
-  commits: Types.ObjectId[]; // Array of ObjectIds referencing Commit
+  commits: Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
 }
-
 const teamSchema: Schema = new Schema<ITeam>(
   {
     teamName: {
       type: String,
       required: true,
     },
-    teamMembers: {
-      type: [String], // Defining this as an array of Strings
-      required: true,
-    },
+    teamMembers: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+        required: true,
+      },
+    ],
     teamLeader: {
-      type: String,
+      type: Schema.Types.ObjectId,
+      ref: 'User',
       required: true,
     },
     githubRepo: {
@@ -38,6 +40,5 @@ const teamSchema: Schema = new Schema<ITeam>(
   },
   { timestamps: true }
 );
-
 const Team = mongoose.model<ITeam>('Team', teamSchema);
 export default Team;

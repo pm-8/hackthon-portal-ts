@@ -1,37 +1,28 @@
 import { type Request, type Response } from 'express';
+import { Types } from 'mongoose';
 import Team from '../models/team.model.js';
-// import User from '../models/user.model.js';
 import Commit from '../models/commit.model.js';
 import { createWebhook } from '../utils/github.util.js';
-import { type AuthRequest } from '../middleware/auth.middleware.js'; // To access req.user
-
-// --- Create Team ---
+import { type AuthRequest } from '../middleware/auth.middleware.js'; 
 export const createTeam = async (req: AuthRequest, res: Response) => {
   try {
     const { teamName, githubRepo, teamMembers } = req.body;
-    const userId = req.user?.id; // Get ID from the logged-in user
-
-    // 1. Create the Team in DB
+    const userId = req.user?.id; 
     const newTeam = await Team.create({
       teamName,
-      teamLeader: userId, // The creator is the leader
-      teamMembers: [userId], // Creator is the first member
+      teamLeader: new Types.ObjectId(userId),
+      teamMembers: [new Types.ObjectId(userId)],
       githubRepo
     });
-
-    // 2. Call GitHub Utility directly (No axios call to self!)
     if (githubRepo) {
-       await createWebhook(githubRepo, newTeam._id as string);
+       await createWebhook(githubRepo, newTeam._id.toString());
     }
-
     res.status(201).json(newTeam);
   } catch (error) {
     console.error('Create Team Error:', error);
     res.status(500).json({ error: 'Failed to create team' });
   }
 };
-
-// --- Join Team ---
 export const joinTeam = async (req: AuthRequest, res: Response) => {
   try {
     const { teamId } = req.params;
@@ -39,37 +30,25 @@ export const joinTeam = async (req: AuthRequest, res: Response) => {
 
     const team = await Team.findById(teamId);
     if (!team) return res.status(404).json({ error: 'Team not found' });
-
-    // Check if already a member
-    if (team.teamMembers.includes(userId as any)) {
+    const isMember = team.teamMembers.some(memberId => memberId.toString() === userId);
+    if (isMember) {
       return res.status(400).json({ error: 'User already in team' });
     }
-
-    // Add user
-    team.teamMembers.push(userId as any);
+    team.teamMembers.push(new Types.ObjectId(userId));
     await team.save();
-
     res.status(200).json(team);
   } catch (error) {
     console.error('Join Team Error:', error);
     res.status(500).json({ error: 'Failed to join team' });
   }
 };
-
-// --- Get Team Details ---
 export const getTeam = async (req: Request, res: Response) => {
   try {
     const { teamId } = req.params;
-
-    // Fetch team and populate members' details (hide password)
     const team = await Team.findById(teamId)
       .populate('teamMembers', 'fullName email githubUsername');
-
     if (!team) return res.status(404).json({ error: 'Team not found' });
-
-    // Fetch commits for this team
-    const commits = await Commit.find({ teamId });
-
+    const commits = await Commit.find({ teamId: new Types.ObjectId(teamId) });
     res.status(200).json({ team, commits });
   } catch (error) {
     console.error('Get Team Error:', error);
