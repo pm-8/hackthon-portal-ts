@@ -9,6 +9,7 @@ import githubRoutes from './routes/github.routes.js';
 import scoreRoutes from './routes/score.routes.js';
 import taskRoutes from './routes/task.routes.js';
 import inviteRoutes from './routes/invite.routes.js';
+import activityRoutes from './routes/activity.routes.js';
 const app: Application = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -32,6 +33,7 @@ app.use('/api/github', githubRoutes);
 app.use('/api/scores', scoreRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/invites', inviteRoutes);
+app.use('/api/activities', activityRoutes);
 // app.use((err: any, req: Request, res: Response, next: express.NextFunction) => {
 //   console.error(err.stack);
 //   res.status(500).json({ error: 'Something went wrong!' });

@@ -9,27 +9,19 @@ export const sendInvite = async (req: AuthRequest, res: Response) => {
   try {
     const { teamId, email } = req.body;
     const senderId = req.user!.id;
-
-    // 1. Check if user exists
     const receiver = await User.findOne({ email });
     if (!receiver) {
       return res.status(404).json({ error: 'User with this email does not exist.' });
     }
-
-    // 2. Check if user is already in a team (Optional: depending on your rules)
-    // For now, let's assume they can't be invited if they are already in THIS team
     const team = await Team.findById(teamId);
     if (team?.teamMembers.includes(receiver._id)) {
       return res.status(400).json({ error: 'User is already in the team.' });
     }
-
-    // 3. Create Invite
     const invite = await Invite.create({
       teamId,
       senderId,
       receiverEmail: email
     });
-
     res.status(201).json({ message: 'Invite sent!', invite });
   } catch (error: any) {
     if (error.code === 11000) {
@@ -42,7 +34,7 @@ export const sendInvite = async (req: AuthRequest, res: Response) => {
 // --- Get My Invites (For the User) ---
 export const getMyInvites = async (req: AuthRequest, res: Response) => {
   try {
-    const userEmail = req.user!.email; // Assuming your Auth middleware attaches email
+    // const userEmail = req.user!.email; // Assuming your Auth middleware attaches email
     // Or fetch user to get email if not in token
     const user = await User.findById(req.user!.id);
     

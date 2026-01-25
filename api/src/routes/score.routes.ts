@@ -2,8 +2,9 @@ import express from 'express';
 import { submitScore, getLeaderboard } from '../controllers/scoreController.js';
 import { protect, authorize } from '../middleware/auth.middleware.js';
 import { UserRole } from '../models/user.model.js';
+import { addScore } from '../controllers/scoreController.js';
 const router = express.Router();
 router.post('/submit', protect, authorize(UserRole.ADMIN), submitScore);
 router.get('/leaderboard', getLeaderboard);
-
+router.post('/add', protect, addScore);
 export default router;

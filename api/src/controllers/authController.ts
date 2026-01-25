@@ -1,7 +1,7 @@
 import {type Request, type Response } from 'express';
 import bcryptjs from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import mongoose from 'mongoose';
+// import mongoose from 'mongoose';
 import User, { type IUser } from '../models/user.model.js';
 const login = async (req: Request, res: Response) => {
   try {
@@ -21,7 +21,7 @@ const login = async (req: Request, res: Response) => {
     );
     res.cookie('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: false,
       sameSite: 'strict',
       maxAge: 3600000 
     });
@@ -41,7 +41,13 @@ const login = async (req: Request, res: Response) => {
   }
 };
 const logout = (req: Request, res: Response) => {
-  res.clearCookie('token');
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: false,
+    sameSite: 'strict',
+    path: '/'
+  });
+  
   res.status(200).json({ message: 'Logged out successfully' });
 };
 const register = async (req : Request, res: Response) : Promise<void> =>{

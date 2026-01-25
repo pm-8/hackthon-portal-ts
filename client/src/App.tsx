@@ -5,6 +5,7 @@ import Register from './pages/Register.tsx';
 import Dashboard from './pages/Dashboard.tsx';
 import KanbanBoard from './pages/KanbanBoard';
 import Leaderboard from './pages/Leaderboard';
+import JudgeDashboard from './pages/JudgesDashboard';
 function App() {
   return (
     <Router>
@@ -15,6 +16,7 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/kanban/:teamId" element={<KanbanBoard />} />
         <Route path="/leaderboard" element={<Leaderboard />} />
+        <Route path="/judge" element={<JudgeDashboard />} />
       </Routes>
     </Router>
   );

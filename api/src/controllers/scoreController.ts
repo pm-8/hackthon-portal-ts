@@ -27,6 +27,24 @@ export const submitScore = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: 'Failed to submit score' });
   }
 };
+export const addScore = async (req: AuthRequest, res: Response) => {
+  try {
+    const { teamId, criteria, score, comment } = req.body;
+    const judgeId = req.user!.id;
+
+    const newScore = await Score.create({
+      teamId : new Types.ObjectId(teamId),
+      judgeId : new Types.ObjectId(judgeId),
+      criteria : criteria, // e.g., { innovation: 9, codeQuality: 8, presentation: 10 }
+      totalScore: score, 
+      comment : comment
+    });
+    
+    res.status(201).json(newScore);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to submit score' });
+  }
+};
 export const getLeaderboard = async (req: Request, res: Response) => {
   try {
     const leaderboard = await Score.aggregate([

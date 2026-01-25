@@ -1,14 +1,12 @@
-
-
-//I have Forgot to post user details for creation of team add it later
-
-
 import { useEffect, useState } from 'react';
 import api from '../api/axios';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
-import { Github, Users, Plus, Zap, CheckCircle, ExternalLink, Mail, Send } from 'lucide-react';
+import { 
+  Github, Users, Plus, Zap, CheckCircle, ExternalLink, 
+  Mail, Send, Activity as ActivityIcon, GitCommit 
+} from 'lucide-react';
 
 interface Team {
   _id: string;
@@ -26,70 +24,86 @@ interface Invite {
   status: string;
 }
 
+interface Activity {
+  _id: string;
+  user: {
+    fullName: string;
+  };
+  action: string;
+  target?: string;
+  createdAt: string;
+}
+
 const Dashboard = () => {
   const [team, setTeam] = useState<Team | null>(null);
-  const [invites, setInvites] = useState<Invite[]>([]); // State for invites
+  const [invites, setInvites] = useState<Invite[]>([]);
   const [loading, setLoading] = useState(true);
-
+  
   // Form State
   const [teamName, setTeamName] = useState('');
   const [githubRepo, setGithubRepo] = useState('');
+  
+  // Activity State
+  const [activities, setActivities] = useState<Activity[]>([]);
 
-  // 1. Fetch Data on Load
-  // 1. Fetch Data on Load
+  // Fetch Team / Invites
   useEffect(() => {
     const init = async () => {
       try {
         setLoading(true);
-        
-        // A. Check if I have a team
         const { data: teamData } = await api.get('/teams/my-team');
         if (teamData) {
           setTeam(teamData);
         }
-
-        // B. If I don't have a team, check for invites
+        // If no team, check for invites
         if (!teamData) {
           const { data: invitesData } = await api.get('/invites/my-invites');
           setInvites(invitesData);
         }
-        
       } catch (error) {
         console.error("Failed to fetch data", error);
-        // Optional: toast.error("Failed to load dashboard data");
       } finally {
         setLoading(false);
       }
     };
     init();
   }, []);
-  // 2. Handle Team Creation
+
+  // Fetch Activities (Only if team exists)
+  useEffect(() => {
+    if (team?._id) {
+      const fetchActivities = async () => {
+        try {
+          const { data } = await api.get(`/activities/${team._id}`);
+          setActivities(data);
+        } catch (e) { console.error(e); }
+      };
+      fetchActivities();
+    }
+  }, [team]);
+
   const handleCreateTeam = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!teamName || !githubRepo) {
       toast.error('Please fill in all fields');
       return;
     }
-
     try {
       const loadingToast = toast.loading('Creating team & setting up webhook...');
       const response = await api.post('/teams/create', { teamName, githubRepo });
       setTeam(response.data);
       toast.dismiss(loadingToast);
-      toast.success('Team created & Webhook added! 🚀');
+      toast.success('Team created & Webhook added!');
     } catch (error: any) {
       toast.dismiss();
       toast.error(error.response?.data?.error || 'Failed to create team');
     }
   };
 
-  // 3. Handle Accepting Invite
   const handleAccept = async (inviteId: string) => {
     try {
       await api.post('/invites/respond', { inviteId, status: 'accepted' });
       toast.success("Joined team successfully! 🎉");
-      // Reload to fetch the new team data (assuming /my-team endpoint exists or user logs in again)
-      // In a real app, you'd fetch the team data here immediately
       window.location.reload(); 
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to accept invite');
@@ -158,7 +172,7 @@ const Dashboard = () => {
               </p>
             </div>
 
-            {/* NEW: Invite Members Section */}
+            {/* Invite Members Section */}
             <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-6 mb-8">
               <div className="flex items-center space-x-2 mb-4">
                 <Mail className="w-5 h-5 text-indigo-600" />
@@ -209,6 +223,50 @@ const Dashboard = () => {
               </Link>
             </div>
 
+            {/* ACTIVITY FEED */}
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm mt-8">
+              <div className="flex items-center gap-2 mb-6">
+                <ActivityIcon className="w-5 h-5 text-orange-500" />
+                <h3 className="text-lg font-bold text-slate-800">Team Activity</h3>
+              </div>
+
+              <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
+                {activities.length === 0 ? (
+                  <p className="text-slate-400 text-sm italic">No recent activity.</p>
+                ) : (
+                  activities.map((activity) => (
+                    <div key={activity._id} className="flex gap-3 items-start text-sm">
+                      {/* Avatar OR Git Icon */}
+                      {activity.action === 'pushed code' ? (
+                        <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-white flex-shrink-0">
+                          <GitCommit className="w-4 h-4" />
+                        </div>
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600 flex-shrink-0">
+                          {activity.user?.fullName?.charAt(0) || '?'}
+                        </div>
+                      )}
+                      
+                      <div className="flex-1">
+                        <p className="text-slate-700">
+                          <span className="font-semibold text-slate-900">{activity.user?.fullName}</span>
+                          {' '}
+                          <span className="text-slate-500">{activity.action}</span>
+                          {' '}
+                          {activity.target && (
+                            <span className="font-medium text-teal-600">"{activity.target}"</span>
+                          )}
+                        </p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          {new Date(activity.createdAt).toLocaleString()} 
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
           </div>
         ) : (
           // VIEW: NO TEAM (CREATE OR JOIN)
@@ -226,7 +284,7 @@ const Dashboard = () => {
               </p>
             </div>
 
-            {/* NEW: Incoming Invites Section */}
+            {/* Incoming Invites Section */}
             {invites.length > 0 && (
               <div className="mb-10 bg-yellow-50 border border-yellow-200 rounded-2xl p-6">
                 <h3 className="text-lg font-bold text-slate-700 mb-4 flex items-center gap-2">

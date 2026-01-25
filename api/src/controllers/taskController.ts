@@ -2,6 +2,7 @@ import { type Response } from 'express';
 import { Types } from 'mongoose';
 import Task from '../models/task.model.js';
 import Team from '../models/team.model.js';
+import { logActivity } from '../utils/activity.utils.js';
 import {type AuthRequest } from '../middleware/auth.middleware.js'; // Check your path for this import
 
 // Helper: Ensure the user actually belongs to the team they are editing
@@ -34,7 +35,7 @@ export const createTask = async (req: AuthRequest, res: Response) => {
       title,
       description
     });
-
+    await logActivity(teamId, req.user!.id, 'created task', newTask.title);
     res.status(201).json(newTask);
   } catch (error) {
     console.error(error);
