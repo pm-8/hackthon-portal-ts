@@ -3,7 +3,7 @@ import { Types } from 'mongoose';
 import Score from '../models/score.model.js';
 import { type AuthRequest } from '../middleware/auth.middleware.js';
 
-export const submitScore = async (req: AuthRequest, res: Response) => {
+export const submitScore = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { teamId, innovation, technicality, presentation, feedback } = req.body;
     const judgeId = req.user?.id;
@@ -27,17 +27,22 @@ export const submitScore = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: 'Failed to submit score' });
   }
 };
-export const addScore = async (req: AuthRequest, res: Response) => {
+
+export const addScore = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { teamId, criteria, score, comment } = req.body;
     const judgeId = req.user!.id;
 
+    // FIX: Extracted criteria into the exact fields Mongoose expects, 
+    // and changed totalScore -> total, comment -> feedback
     const newScore = await Score.create({
-      teamId : new Types.ObjectId(teamId),
-      judgeId : new Types.ObjectId(judgeId),
-      criteria : criteria, // e.g., { innovation: 9, codeQuality: 8, presentation: 10 }
-      totalScore: score, 
-      comment : comment
+      teamId: new Types.ObjectId(teamId),
+      judgeId: new Types.ObjectId(judgeId),
+      innovation: criteria?.innovation || 0,
+      technicality: criteria?.technicality || 0,
+      presentation: criteria?.presentation || 0,
+      total: score, 
+      feedback: comment
     });
     
     res.status(201).json(newScore);
@@ -45,7 +50,8 @@ export const addScore = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: 'Failed to submit score' });
   }
 };
-export const getLeaderboard = async (req: Request, res: Response) => {
+
+export const getLeaderboard = async (req: Request, res: Response): Promise<void> => {
   try {
     const leaderboard = await Score.aggregate([
       {
