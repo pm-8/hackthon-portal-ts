@@ -5,7 +5,7 @@ const Login = () => {
     // CRITICAL: We do NOT use axios here! 
     // OAuth requires a full page redirect so GitHub can show their authorization screen.
     // Replace the URL with your backend URL if it's deployed.
-    window.location.href = 'http://localhost:5000/api/auth/github';
+    window.location.href = 'https://hackthon-portal-ts.onrender.com/api/auth/github';
   };
 
   return (
