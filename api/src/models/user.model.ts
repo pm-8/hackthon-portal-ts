@@ -1,19 +1,22 @@
 import mongoose, { Schema, Document } from 'mongoose';
+export enum UserRole {
+  HACKER = 'hacker',
+  MENTOR = 'mentor',
+  ADMIN = 'admin'
+}
 export interface IUser extends Document {
   fullName?: string;
   email: string;
-  password: string;
+  githubId: string;
   githubUsername: string;
-  role: 'hacker' | 'mentor' | 'admin';
+  avatarUrl?: string;
+  role: UserRole;
+  teamId?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
-export enum UserRole {
-    HACKER = 'hacker',
-    MENTOR = 'mentor',
-    ADMIN = 'admin'
-}
-const userSchema: Schema = new Schema<IUser>(
+
+const userSchema = new Schema<IUser>(
   {
     fullName: {
       type: String,
@@ -22,23 +25,36 @@ const userSchema: Schema = new Schema<IUser>(
     email: {
       type: String,
       required: true,
+      unique: true,
+      trim: true,
+      lowercase: true,
     },
-    password: {
+    githubId: {
       type: String,
       required: true,
-      unique: false,
+      unique: true,
     },
     githubUsername: {
       type: String,
-      default: "",
       required: true,
+    },
+    avatarUrl: {
+      type: String,
+      default: "",
     },
     role: {
       type: String,
       enum: Object.values(UserRole),
+      default: UserRole.HACKER,
     },
+    teamId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Team',
+      default: null,
+    }
   },
   { timestamps: true }
 );
+
 const User = mongoose.model<IUser>('User', userSchema);
 export default User;

@@ -1,77 +1,119 @@
-import {type Request, type Response } from 'express';
-import bcryptjs from 'bcryptjs';
+import { type Request, type Response } from 'express';
+import axios from 'axios';
 import jwt from 'jsonwebtoken';
-// import mongoose from 'mongoose';
-import User, { type IUser } from '../models/user.model.js';
-const login = async (req: Request, res: Response) => {
+import User, { UserRole } from '../models/user.model.js';
+
+// 1. Redirect user to GitHub's OAuth page
+const githubLogin = (req: Request, res: Response) => {
+  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&scope=read:user user:email`;
+  res.redirect(githubAuthUrl);
+};
+
+// 2. Handle the callback from GitHub
+const githubCallback = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email });
+    const { code } = req.query;
+
+    if (!code) {
+      res.status(400).json({ error: 'No code provided by GitHub' });
+      return;
+    }
+
+    // Step 1: Exchange the code for an Access Token
+    const tokenResponse = await axios.post(
+      'https://github.com/login/oauth/access_token',
+      {
+        client_id: process.env.GITHUB_CLIENT_ID,
+        client_secret: process.env.GITHUB_CLIENT_SECRET,
+        code,
+      },
+      {
+        headers: { Accept: 'application/json' },
+      }
+    );
+
+    const accessToken = tokenResponse.data.access_token;
+
+    if (!accessToken) {
+      res.status(400).json({ error: 'Failed to fetch access token from GitHub' });
+      return;
+    }
+
+    // Step 2: Fetch the user's GitHub profile
+    const userResponse = await axios.get('https://api.github.com/user', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    const githubProfile = userResponse.data;
+
+    // Step 3: Fetch the user's email (sometimes it's hidden in the main profile)
+    let email = githubProfile.email;
+    if (!email) {
+      const emailResponse = await axios.get('https://api.github.com/user/emails', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      // Find the primary, verified email
+      const primaryEmailObj = emailResponse.data.find(
+        (e: any) => e.primary === true && e.verified === true
+      );
+      email = primaryEmailObj ? primaryEmailObj.email : null;
+    }
+
+    if (!email) {
+      res.status(400).json({ error: 'GitHub email is required to register.' });
+      return;
+    }
+
+    // Step 4: Find or Create the User in our Database
+    let user = await User.findOne({ githubId: githubProfile.id.toString() });
+
     if (!user) {
-      return res.status(400).json({ error: 'Invalid Credentials' });
+      // Create new user if they don't exist
+      user = await User.create({
+        githubId: githubProfile.id.toString(),
+        githubUsername: githubProfile.login,
+        email: email,
+        fullName: githubProfile.name || githubProfile.login, // Fallback to username if name is null
+        avatarUrl: githubProfile.avatar_url,
+        role: UserRole.HACKER, // Default role
+      });
     }
-    const isMatch = await bcryptjs.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ error: 'Invalid Credentials' });
-    }
+
+    // Step 5: Issue our own JWT Token for the frontend
     const token = jwt.sign(
       { id: user._id, role: user.role, fullName: user.fullName },
-      process.env.SECRET_KEY as string,
-      { expiresIn: '1h' }
+      process.env.JWT_SECRET as string,
+      { expiresIn: '7d' } // 7 days is good for a hackathon
     );
+
+    // Set cookie
     res.cookie('token', token, {
       httpOnly: true,
-      secure: false,
-      sameSite: 'strict',
-      maxAge: 3600000 
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax', // 'lax' is better for OAuth redirects than 'strict'
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 Days
     });
-    res.status(200).json({
-      message: 'Login Successful',
-      token,
-      user: {
-        id: user._id,
-        fullName: user.fullName,
-        email: user.email,
-        role: user.role
-      }
-    });
+
+    // Step 6: Redirect back to your Frontend (React App)
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+    res.redirect(`${FRONTEND_URL}/dashboard`);
+
   } catch (error) {
-    console.error('Login Error:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error('GitHub OAuth Error:', error);
+    res.status(500).json({ error: 'Internal Server Error during Authentication' });
   }
 };
+
+// 3. Logout remains mostly the same
 const logout = (req: Request, res: Response) => {
   res.clearCookie('token', {
     httpOnly: true,
-    secure: false,
-    sameSite: 'strict',
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
     path: '/'
   });
   
   res.status(200).json({ message: 'Logged out successfully' });
 };
-const register = async (req : Request, res: Response) : Promise<void> =>{
-    try{
-        const { fullName, email, password, githubUsername , role} = req.body;
-        const existingUser = await User.findOne({ email });
-        if(existingUser){
-            res.status(400).json({ error: 'User already exists with this email' });
-            return;
-        }
-        const salt = bcryptjs.genSaltSync(10);
-        const hashedPassword = bcryptjs.hashSync(password, salt);
-        const newUser = await User.create({
-            fullName,
-            email,
-            password: hashedPassword,
-            githubUsername,
-            role: role || 'hacker'
-        });
-        const { password: _, ...userWithoutPassword } = newUser.toObject();
-        res.status(201).json(userWithoutPassword);
-    } catch (error){
-        console.error('Registration Error:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-}
-export { register, login, logout };
+
+export { githubLogin, githubCallback, logout };
