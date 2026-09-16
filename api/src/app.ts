@@ -17,7 +17,7 @@ app.use(cookieParser());
 app.use(helmet());
 app.use(morgan('dev'));
 app.use(cors({
-  origin: ["http://localhost:5173", "http://localhost:5174"], 
+  origin: ["*"], 
   credentials: true, 
 }));
 app.get('/', (req: Request, res: Response) => {
