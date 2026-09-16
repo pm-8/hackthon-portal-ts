@@ -1,57 +1,71 @@
 import { type Request, type Response } from 'express';
 import { Types } from 'mongoose';
 import Team from '../models/team.model.js';
-import User from '../models/user.model.js'; // <-- NEW: We need to update the user!
+import User from '../models/user.model.js'; 
 import Commit from '../models/commit.model.js';
-import { createWebhook } from '../utils/github.util.js';
+import { parseGitHubRepoUrl } from '../utils/github.util.js';
 import { type AuthRequest } from '../middleware/auth.middleware.js';
 
-export const createTeam = async (req: AuthRequest, res: Response): Promise<void> => {
+export const createTeam = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
   try {
-    const { teamName, githubRepo } = req.body; 
-    
-    // AuthMiddleware guarantees user exists
-    const userId = req.user!.id; 
-    console.log('Creating team for user:', req.user!.fullName);
+    const { teamName, githubRepo } = req.body;
 
-    // 1. Check if user is already in a team
-    const existingUser = await User.findById(userId);
-    if (existingUser?.teamId) {
-      res.status(400).json({ error: 'You are already in a team!' });
+    const userId = req.user!.id;
+
+    if (!teamName || !githubRepo) {
+      res.status(400).json({
+        error: 'Team name and GitHub repository are required',
+      });
       return;
     }
 
-    // 2. Create the Team
+    // Validate repo URL before creating anything.
+    parseGitHubRepoUrl(githubRepo);
+
+    const existingUser = await User.findById(userId);
+
+    if (existingUser?.teamId) {
+      res.status(400).json({
+        error: 'You are already in a team!',
+      });
+      return;
+    }
+
     const newTeam = await Team.create({
       teamName,
       teamLeader: new Types.ObjectId(userId),
-      teamMembers: [new Types.ObjectId(userId)], 
-      githubRepo
+      teamMembers: [new Types.ObjectId(userId)],
+      githubRepo,
+      githubConnected: false,
     });
 
-    // 3. LINK THE USER TO THE TEAM (CRITICAL FIX)
-    await User.findByIdAndUpdate(userId, { teamId: newTeam._id });
+    await User.findByIdAndUpdate(
+      userId,
+      { teamId: newTeam._id }
+    );
 
-    // 4. Try to create the webhook
-    if (githubRepo) {
-      try {
-        await createWebhook(githubRepo, newTeam._id.toString());
-      } catch (webhookError) {
-        console.error("Webhook creation failed, but team was created:", webhookError);
-        // We don't want to crash the whole request if just the webhook fails
-      }
-    }
+    await newTeam.populate(
+      'teamMembers',
+      'fullName email githubUsername avatarUrl'
+    );
 
-    // 5. Populate and return
-    await newTeam.populate('teamMembers', 'fullName email githubUsername avatarUrl');
-    res.status(201).json(newTeam);
+    res.status(201).json({
+      team: newTeam,
+      githubConnected: false,
+    });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Create Team Error:', error);
-    res.status(500).json({ error: 'Failed to create team' });
+
+    res.status(500).json({
+      error:
+        error.message || 'Failed to create team',
+    });
   }
 };
-
 export const joinTeam = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { teamId } = req.params;

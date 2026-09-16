@@ -4,6 +4,12 @@ export interface ITeam extends Document {
   teamMembers: Types.ObjectId[]; 
   teamLeader: Types.ObjectId;
   githubRepo: string;
+  githubConnected: boolean;
+  githubInstallationId: Number;
+  githubRepoId: Number;
+  githubOwner: string;
+  githubRepoName: string;
+  githubConnectedAt: Date;
   commits: Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
@@ -14,6 +20,7 @@ const teamSchema: Schema = new Schema<ITeam>(
       type: String,
       required: true,
     },
+
     teamMembers: [
       {
         type: Schema.Types.ObjectId,
@@ -21,16 +28,48 @@ const teamSchema: Schema = new Schema<ITeam>(
         required: true,
       },
     ],
+
     teamLeader: {
       type: Schema.Types.ObjectId,
       ref: 'User',
       required: true,
     },
+
     githubRepo: {
       type: String,
       required: true,
-      default: "",
     },
+
+    githubConnected: {
+      type: Boolean,
+      default: false,
+    },
+
+    githubInstallationId: {
+      type: Number,
+      default: null,
+    },
+
+    githubRepoId: {
+      type: Number,
+      default: null,
+    },
+
+    githubOwner: {
+      type: String,
+      default: null,
+    },
+
+    githubRepoName: {
+      type: String,
+      default: null,
+    },
+
+    githubConnectedAt: {
+      type: Date,
+      default: null,
+    },
+
     commits: [
       {
         type: Schema.Types.ObjectId,

@@ -1,42 +1,122 @@
 import axios from 'axios';
+import jwt from 'jsonwebtoken';
 
-export const createWebhook = async (repoUrl: string, teamId: string): Promise<any> => {
+export interface ParsedGitHubRepo {
+  owner: string;
+  repo: string;
+}
+
+export const parseGitHubRepoUrl = (
+  repoUrl: string
+): ParsedGitHubRepo => {
+  let url: URL;
+
   try {
-    const urlParts = repoUrl.split('github.com/');
-    if (urlParts.length < 2 || !urlParts[1]) {
-      throw new Error('Invalid GitHub URL');
-    }
-    const rawPath = urlParts[1]
-      .replace('.git', '')
-      .replace(/\/$/, '');
-    const [owner, repo] = rawPath.split('/');
-    if (!owner || !repo) {
-      throw new Error('Could not extract owner and repo from URL');
-    }
-    const webhookUrl = `${process.env.API_URL}/api/github/webhook/${teamId}`;
-    console.log(`Setting up webhook for ${owner}/${repo} -> ${webhookUrl}`);
-    const response = await axios.post(
-      `https://api.github.com/repos/${owner}/${repo}/hooks`,
-      {
-        name: 'web',
-        active: true,
-        events: ['push', 'pull_request'], 
-        config: {
-          url: webhookUrl,
-          content_type: 'json',
-        },
-      },
-      {
-        headers: {
-          Authorization: `token ${process.env.GITHUB_TOKEN}`,
-          Accept: 'application/vnd.github.v3+json',
-        },
-      }
-    );
-
-    return response.data;
-  } catch (error: any) {
-    console.error('GitHub Webhook Error:', error.response?.data || error.message);
-    return null; 
+    url = new URL(repoUrl);
+  } catch {
+    throw new Error('Invalid GitHub repository URL');
   }
+
+  if (
+    url.hostname !== 'github.com' &&
+    url.hostname !== 'www.github.com'
+  ) {
+    throw new Error('Repository must be hosted on github.com');
+  }
+
+  const parts = url.pathname
+    .replace(/^\/+|\/+$/g, '')
+    .split('/');
+
+  if (parts.length !== 2) {
+    throw new Error(
+      'Repository URL must look like https://github.com/owner/repository'
+    );
+  }
+
+  const [owner, rawRepo] = parts;
+
+  const repo = rawRepo.replace(/\.git$/, '');
+
+  if (!owner || !repo) {
+    throw new Error('Invalid GitHub repository URL');
+  }
+
+  return { owner, repo };
+};
+
+const getGitHubAppPrivateKey = (): string => {
+  const encoded = process.env.GITHUB_APP_PRIVATE_KEY_BASE64;
+
+  if (!encoded) {
+    throw new Error(
+      'GITHUB_APP_PRIVATE_KEY_BASE64 is not configured'
+    );
+  }
+
+  return Buffer.from(encoded, 'base64').toString('utf8');
+};
+
+export const createGitHubAppJwt = (): string => {
+  const appId = process.env.GITHUB_APP_ID;
+
+  if (!appId) {
+    throw new Error('GITHUB_APP_ID is not configured');
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+
+  return jwt.sign(
+    {
+      iat: now - 60,
+      exp: now + 9 * 60,
+      iss: appId,
+    },
+    getGitHubAppPrivateKey(),
+    {
+      algorithm: 'RS256',
+    }
+  );
+};
+
+export const createInstallationAccessToken = async (
+  installationId: number
+): Promise<string> => {
+  const appJwt = createGitHubAppJwt();
+
+  const response = await axios.post(
+    `https://api.github.com/app/installations/${installationId}/access_tokens`,
+    {},
+    {
+      headers: {
+        Authorization: `Bearer ${appJwt}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2026-03-10',
+      },
+    }
+  );
+
+  return response.data.token;
+};
+
+export const getInstalledRepository = async (
+  installationId: number,
+  owner: string,
+  repo: string
+) => {
+  const installationToken =
+    await createInstallationAccessToken(installationId);
+
+  const response = await axios.get(
+    `https://api.github.com/repos/${owner}/${repo}`,
+    {
+      headers: {
+        Authorization: `Bearer ${installationToken}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2026-03-10',
+      },
+    }
+  );
+
+  return response.data;
 };

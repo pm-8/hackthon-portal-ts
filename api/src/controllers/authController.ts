@@ -5,15 +5,22 @@ import User, { UserRole } from '../models/user.model.js';
 
 // 1. Redirect user to GitHub's OAuth page
 const githubLogin = (req: Request, res: Response) => {
-  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&scope=read:user user:email`;
-  res.redirect(githubAuthUrl);
+  const params = new URLSearchParams({
+    client_id: process.env.GITHUB_CLIENT_ID!,
+    redirect_uri: process.env.GITHUB_CALLBACK_URL!,
+    scope: 'read:user user:email',
+  });
+
+  res.redirect(
+    `https://github.com/login/oauth/authorize?${params.toString()}`
+  );
 };
 
 // 2. Handle the callback from GitHub
 const githubCallback = async (req: Request, res: Response): Promise<void> => {
   try {
     const { code } = req.query;
-
+    console.log("Got the code");
     if (!code) {
       res.status(400).json({ error: 'No code provided by GitHub' });
       return;
@@ -26,14 +33,17 @@ const githubCallback = async (req: Request, res: Response): Promise<void> => {
         client_id: process.env.GITHUB_CLIENT_ID,
         client_secret: process.env.GITHUB_CLIENT_SECRET,
         code,
+        redirect_uri: process.env.GITHUB_CALLBACK_URL,
       },
       {
-        headers: { Accept: 'application/json' },
+        headers: {
+          Accept: 'application/json',
+        },
       }
     );
 
     const accessToken = tokenResponse.data.access_token;
-
+    console.log("Got the token!");
     if (!accessToken) {
       res.status(400).json({ error: 'Failed to fetch access token from GitHub' });
       return;
@@ -45,9 +55,10 @@ const githubCallback = async (req: Request, res: Response): Promise<void> => {
     });
 
     const githubProfile = userResponse.data;
-
+    console.log(githubProfile);
     // Step 3: Fetch the user's email (sometimes it's hidden in the main profile)
     let email = githubProfile.email;
+
     if (!email) {
       const emailResponse = await axios.get('https://api.github.com/user/emails', {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -77,6 +88,7 @@ const githubCallback = async (req: Request, res: Response): Promise<void> => {
         avatarUrl: githubProfile.avatar_url,
         role: UserRole.HACKER, // Default role
       });
+      console.log(user);
     }
 
     // Step 5: Issue our own JWT Token for the frontend
@@ -87,11 +99,17 @@ const githubCallback = async (req: Request, res: Response): Promise<void> => {
     );
 
     // Set cookie
+    const isProduction =
+      process.env.NODE_ENV === 'production';
+
     res.cookie('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax', // 'lax' is better for OAuth redirects than 'strict'
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 Days
+      secure: isProduction,
+      sameSite: isProduction
+        ? 'none'
+        : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/',
     });
 
     // Step 6: Redirect back to your Frontend (React App)

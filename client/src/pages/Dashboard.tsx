@@ -13,6 +13,10 @@ interface Team {
   teamName: string;
   githubRepo: string;
   teamMembers: string[];
+
+  githubConnected: boolean;
+  githubInstallationId?: number;
+  githubRepoId?: number;
 }
 
 interface Invite {
@@ -82,21 +86,52 @@ const Dashboard = () => {
     }
   }, [team]);
 
-  const handleCreateTeam = async (e: React.FormEvent) => {
+  const handleCreateTeam = async (
+    e: React.FormEvent
+  ) => {
     e.preventDefault();
+
     if (!teamName || !githubRepo) {
-      toast.error('Please fill in all fields');
+      toast.error(
+        'Please fill in all fields'
+      );
       return;
     }
+
     try {
-      const loadingToast = toast.loading('Creating team & setting up webhook...');
-      const response = await api.post('/teams/create', { teamName, githubRepo });
-      setTeam(response.data);
+      const loadingToast =
+        toast.loading(
+          'Creating team...'
+        );
+
+      const response = await api.post(
+        '/teams',
+        {
+          teamName,
+          githubRepo,
+        }
+      );
+
       toast.dismiss(loadingToast);
-      toast.success('Team created & Webhook added!');
+
+      const createdTeam =
+        response.data.team;
+
+      setTeam(createdTeam);
+
+      toast.success(
+        'Team created! Connect your GitHub repository.'
+      );
+
+      window.location.href = `http://localhost:5000/api/github/install/${createdTeam._id}`;
+
     } catch (error: any) {
       toast.dismiss();
-      toast.error(error.response?.data?.error || 'Failed to create team');
+
+      toast.error(
+        error.response?.data?.error ||
+        'Failed to create team'
+      );
     }
   };
 
@@ -165,12 +200,38 @@ const Dashboard = () => {
               </a>
             </div>
 
-            <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 mb-8">
-              <p className="text-blue-700 text-sm flex items-center space-x-2 font-medium">
-                <Zap className="w-4 h-4" />
-                <span>Webhook is active and listening for pushes</span>
-              </p>
-            </div>
+            {team.githubConnected ? (
+              <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 mb-8">
+                <p className="text-emerald-700 text-sm flex items-center gap-2 font-medium">
+                  <CheckCircle className="w-4 h-4" />
+                  GitHub connected — pushes are being tracked.
+                </p>
+              </div>
+            ) : (
+              <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 mb-8">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-amber-800 font-semibold">
+                      GitHub repository not connected
+                    </p>
+
+                    <p className="text-amber-700 text-sm mt-1">
+                      Install HackPortal on this repository to
+                      start tracking commits.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      window.location.href = `http://localhost:5000/api/github/install/${team._id}`;
+                    }}
+                    className="bg-amber-600 hover:bg-amber-700 text-white px-5 py-3 rounded-xl font-semibold"
+                  >
+                    Connect GitHub
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Invite Members Section */}
             <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-6 mb-8">

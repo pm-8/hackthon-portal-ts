@@ -1,16 +1,24 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { LogOut, Zap, LayoutDashboard, Trophy } from 'lucide-react';
+import {
+  LogOut,
+  Zap,
+  LayoutDashboard,
+  Trophy,
+  UserPlus,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
-
+import api from '../api/axios';
 const Navbar = () => {
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    // Clear any stored tokens if you are using localStorage
-    // localStorage.removeItem('token'); 
-    
-    toast.success('Logged out successfully');
-    navigate('/');
+  const handleLogout = async () => {
+    try {
+      await api.post('/auth/logout');
+      toast.success('Logged out successfully');
+      navigate('/');
+    } catch {
+      toast.error('Logout failed');
+    }
   };
 
   return (
@@ -46,6 +54,13 @@ const Navbar = () => {
             >
               <LayoutDashboard className="w-4 h-4" />
               <span>Dashboard</span>
+            </Link>
+            <Link
+              to="/join-team"
+              className="flex items-center space-x-2 text-slate-600 hover:text-slate-900 transition-colors duration-200 font-medium text-sm"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>Join Team</span>
             </Link>
             
             {/* Logout Button */}

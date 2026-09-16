@@ -11,15 +11,31 @@ import taskRoutes from './routes/task.routes.js';
 import inviteRoutes from './routes/invite.routes.js';
 import activityRoutes from './routes/activity.routes.js';
 const app: Application = express();
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (req, _res, buffer) => {
+      (
+        req as Request & {
+          rawBody?: Buffer;
+        }
+      ).rawBody = Buffer.from(buffer);
+    },
+  })
+);
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(helmet());
 app.use(morgan('dev'));
-app.use(cors({
-  origin: ["*"], 
-  credentials: true, 
-}));
+
+app.use(
+  cors({
+    origin: [
+  'http://localhost:5173',
+  'http://localhost:5174',
+],
+    credentials: true,
+  })
+);
 app.get('/', (req: Request, res: Response) => {
   res.status(200).json({
     status: 'success',

@@ -1,80 +1,182 @@
-import { type Request, type Response } from 'express';
+import crypto from 'crypto';
 import { Types } from 'mongoose';
+import { type Request, type Response } from 'express';
+
 import Team from '../models/team.model.js';
 import Commit from '../models/commit.model.js';
-import User from '../models/user.model.js'; 
-import { logActivity } from '../utils/activity.utils.js'; 
+import User from '../models/user.model.js';
+import { logActivity } from '../utils/activity.utils.js';
 
-export const webhookHandler = async (req: Request, res: Response) => {
+const verifyGitHubSignature = (
+  req: Request
+): boolean => {
+  const secret =
+    process.env.GITHUB_APP_WEBHOOK_SECRET;
+
+  const signature =
+    req.headers['x-hub-signature-256'];
+
+  const rawBody =
+    (req as Request & { rawBody?: Buffer }).rawBody;
+
+  if (!secret || !signature || !rawBody) {
+    return false;
+  }
+
+  const expected =
+    `sha256=${crypto
+      .createHmac('sha256', secret)
+      .update(rawBody)
+      .digest('hex')}`;
+
+  const provided =
+    Array.isArray(signature)
+      ? signature[0]
+      : signature;
+
+  const expectedBuffer =
+    Buffer.from(expected);
+
+  const providedBuffer =
+    Buffer.from(provided);
+
+  if (
+    expectedBuffer.length !==
+    providedBuffer.length
+  ) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(
+    expectedBuffer,
+    providedBuffer
+  );
+};
+
+export const webhookHandler = async (
+  req: Request,
+  res: Response
+) => {
   try {
-    const { teamId } = req.params;
-    const eventType = req.headers['x-github-event'];
-    const payload = req.body;
-    if (!teamId) {
-      return res.status(400).send('Team ID is required in the URL');
+    if (!verifyGitHubSignature(req)) {
+      console.warn(
+        'Rejected GitHub webhook: invalid signature'
+      );
+
+      return res
+        .status(401)
+        .send('Invalid webhook signature');
     }
 
-    console.log(`Received GitHub event: ${eventType} for team: ${teamId}`);
+    const eventType =
+      req.headers['x-github-event'];
 
-    if (eventType === 'push') {
-      const commits = payload.commits;
-      if (!commits || commits.length === 0) {
-        return res.status(200).send('No commits to process');
-      }
+    const payload = req.body;
 
-      // Note: This grabs the first commit in the batch. 
-      // In a production app, you might want to loop through all 'commits'
-      const latestCommit = commits[0];
-      console.log('Processing commit:', latestCommit.message);
+    console.log(
+      `Received GitHub event: ${eventType}`
+    );
 
-      // --- SAVE TO DATABASE ---
+    if (eventType !== 'push') {
+      return res
+        .status(200)
+        .send('Event ignored');
+    }
+
+    const repositoryId =
+      payload.repository?.id;
+
+    const installationId =
+      payload.installation?.id;
+
+    if (!repositoryId || !installationId) {
+      return res
+        .status(400)
+        .send('Missing repository or installation');
+    }
+
+    const team = await Team.findOne({
+      githubRepoId: repositoryId,
+      githubInstallationId: installationId,
+      githubConnected: true,
+    });
+
+    if (!team) {
+      console.warn(
+        `No team mapped to GitHub repository ${repositoryId}`
+      );
+
+      // Return 200 so GitHub does not keep retrying.
+      return res
+        .status(200)
+        .send('Repository not connected to a team');
+    }
+
+    const commits = payload.commits ?? [];
+
+    for (const githubCommit of commits) {
       const newCommit = await Commit.create({
-        teamId: new Types.ObjectId(teamId), // Safe now because we checked teamId above
-        commitId: latestCommit.id,
+        teamId: team._id,
+        commitId: githubCommit.id,
         repoUrl: payload.repository.html_url,
-        commitMessage: latestCommit.message,
-        committerName: latestCommit.committer.name,
-        committerEmail: latestCommit.committer.email,
-        commitUrl: latestCommit.url,
-        committedAt: new Date(latestCommit.timestamp)
+        commitMessage: githubCommit.message,
+        committerName:
+          githubCommit.committer?.name ||
+          payload.sender?.login ||
+          'Unknown',
+        committerEmail:
+          githubCommit.committer?.email,
+        commitUrl: githubCommit.url,
+        committedAt:
+          new Date(githubCommit.timestamp),
       });
 
-      console.log('Commit saved:', newCommit._id);
-
       await Team.findByIdAndUpdate(
-        teamId,
-        { $push: { commits: newCommit._id } }
+        team._id,
+        {
+          $push: {
+            commits: newCommit._id,
+          },
+        }
       );
-      
-      console.log('Team updated with new commit');
 
-      // --- LOG TO ACTIVITY FEED ---
-      
-      // 1. Identify the user who pushed
-      const githubUsername = payload.pusher.name; 
-      
-      // 2. Find that user in our Database
-      const user = await User.findOne({ githubUsername });
+      console.log(
+        `Saved commit ${githubCommit.id}`
+      );
 
-      if (user) {
-        // 3. Log the activity
-        // We pass teamId (string) and user._id (ObjectId).
-        // Our updated activity.utils.ts handles these types automatically now.
-        await logActivity(
-          teamId,
-          user._id, 
-          'pushed code', 
-          latestCommit.message 
-        );
-        console.log('Activity logged to dashboard');
-      } else {
-        console.warn(`User with GitHub username '${githubUsername}' not found in DB. Activity skipped.`);
+      const githubUsername =
+        payload.sender?.login;
+
+      if (githubUsername) {
+        const user = await User.findOne({
+          githubUsername,
+        });
+
+        if (user) {
+          await logActivity(
+            team._id,
+            user._id,
+            'pushed code',
+            githubCommit.message
+          );
+        }
       }
     }
 
-    res.status(200).send('Webhook received successfully');
+    return res
+      .status(200)
+      .send('Webhook processed successfully');
+
   } catch (error) {
-    console.error('Webhook Error:', error);
-    res.status(500).json({ error: 'Failed to process webhook' });
+    console.error(
+      'Webhook Error:',
+      error
+    );
+
+    return res
+      .status(500)
+      .json({
+        error: 'Failed to process webhook',
+      });
   }
 };
