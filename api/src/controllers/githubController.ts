@@ -33,7 +33,9 @@ const verifyGitHubSignature = (
     Array.isArray(signature)
       ? signature[0]
       : signature;
-
+  if (!provided) {
+    return false;
+  }
   const expectedBuffer =
     Buffer.from(expected);
 

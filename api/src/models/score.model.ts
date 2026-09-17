@@ -14,9 +14,26 @@ const scoreSchema: Schema = new Schema<IScore>(
   {
     teamId: { type: Schema.Types.ObjectId, ref: 'Team', required: true },
     judgeId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    innovation: { type: Number, required: true, min: 1, max: 10 },
-    technicality: { type: Number, required: true, min: 1, max: 10 },
-    presentation: { type: Number, required: true, min: 1, max: 10 },
+    innovation: {
+      type: Number,
+      required: true,
+      min: 0,
+      max: 10,
+    },
+
+    technicality: {
+      type: Number,
+      required: true,
+      min: 0,
+      max: 10,
+    },
+
+    presentation: {
+      type: Number,
+      required: true,
+      min: 0,
+      max: 10,
+    },
     total: { type: Number, default: 0 },
     feedback: { type: String }
   },

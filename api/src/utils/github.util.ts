@@ -35,7 +35,9 @@ export const parseGitHubRepoUrl = (
   }
 
   const [owner, rawRepo] = parts;
-
+  if (!owner || !rawRepo) {
+    throw new Error('Invalid GitHub repository URL');
+  }
   const repo = rawRepo.replace(/\.git$/, '');
 
   if (!owner || !repo) {
@@ -98,7 +100,37 @@ export const createInstallationAccessToken = async (
 
   return response.data.token;
 };
+export const addRepositoryCollaborator = async (
+  installationId: number,
+  owner: string,
+  repo: string,
+  username: string
+) => {
+  const installationToken =
+    await createInstallationAccessToken(
+      installationId
+    );
 
+  const response = await axios.put(
+    `https://api.github.com/repos/${owner}/${repo}/collaborators/${encodeURIComponent(username)}`,
+    {},
+    {
+      headers: {
+        Authorization: `Bearer ${installationToken}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2026-03-10',
+      },
+    }
+  );
+
+  return {
+    status: response.status,
+    invited:
+      response.status === 201,
+    alreadyCollaborator:
+      response.status === 204,
+  };
+};
 export const getInstalledRepository = async (
   installationId: number,
   owner: string,

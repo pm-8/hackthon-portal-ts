@@ -1,4 +1,5 @@
 import { type Request, type Response } from 'express';
+import type { AuthRequest } from '../middleware/auth.middleware.js';
 import axios from 'axios';
 import jwt from 'jsonwebtoken';
 import User, { UserRole } from '../models/user.model.js';
@@ -56,6 +57,30 @@ const githubCallback = async (req: Request, res: Response): Promise<void> => {
 
     const githubProfile = userResponse.data;
     console.log(githubProfile);
+    const mentorUsernames = (
+        process.env.MENTOR_GITHUB_USERNAMES || ''
+    )
+      .split(',')
+      .map((username) => username.trim().toLowerCase())
+      .filter(Boolean);
+
+    const adminUsernames = (
+      process.env.ADMIN_GITHUB_USERNAMES || ''
+    )
+      .split(',')
+      .map((username) => username.trim().toLowerCase())
+      .filter(Boolean);
+
+    const githubUsername =
+      githubProfile.login.toLowerCase();
+
+    let assignedRole = UserRole.HACKER;
+
+    if (adminUsernames.includes(githubUsername)) {
+      assignedRole = UserRole.ADMIN;
+    } else if (mentorUsernames.includes(githubUsername)) {
+      assignedRole = UserRole.MENTOR;
+    }
     // Step 3: Fetch the user's email (sometimes it's hidden in the main profile)
     let email = githubProfile.email;
 
@@ -76,19 +101,29 @@ const githubCallback = async (req: Request, res: Response): Promise<void> => {
     }
 
     // Step 4: Find or Create the User in our Database
-    let user = await User.findOne({ githubId: githubProfile.id.toString() });
+    let user = await User.findOne({
+      githubId: githubProfile.id.toString(),
+    });
 
     if (!user) {
-      // Create new user if they don't exist
       user = await User.create({
         githubId: githubProfile.id.toString(),
         githubUsername: githubProfile.login,
-        email: email,
-        fullName: githubProfile.name || githubProfile.login, // Fallback to username if name is null
+        email,
+        fullName:
+          githubProfile.name || githubProfile.login,
         avatarUrl: githubProfile.avatar_url,
-        role: UserRole.HACKER, // Default role
+        role: assignedRole,
       });
-      console.log(user);
+    } else {
+      // Organizer can promote a user through the allowlist.
+      if (
+        assignedRole !== UserRole.HACKER &&
+        user.role !== assignedRole
+      ) {
+        user.role = assignedRole;
+        await user.save();
+      }
     }
 
     // Step 5: Issue our own JWT Token for the frontend
@@ -121,7 +156,31 @@ const githubCallback = async (req: Request, res: Response): Promise<void> => {
     res.status(500).json({ error: 'Internal Server Error during Authentication' });
   }
 };
+const getCurrentUser = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const user = await User.findById(req.user!.id).select(
+      '_id fullName email githubUsername avatarUrl role teamId'
+    );
 
+    if (!user) {
+      res.status(404).json({
+        error: 'User not found',
+      });
+      return;
+    }
+
+    res.status(200).json(user);
+  } catch (error) {
+    console.error('Get Current User Error:', error);
+
+    res.status(500).json({
+      error: 'Failed to fetch current user',
+    });
+  }
+};
 // 3. Logout remains mostly the same
 const logout = (req: Request, res: Response) => {
   res.clearCookie('token', {
@@ -134,4 +193,9 @@ const logout = (req: Request, res: Response) => {
   res.status(200).json({ message: 'Logged out successfully' });
 };
 
-export { githubLogin, githubCallback, logout };
+export {
+  githubLogin,
+  githubCallback,
+  logout,
+  getCurrentUser,
+};

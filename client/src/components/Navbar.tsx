@@ -1,4 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import {
   LogOut,
   Zap,
@@ -8,8 +9,32 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api/axios';
+type UserRole =
+  | 'hacker'
+  | 'mentor'
+  | 'admin';
+
 const Navbar = () => {
   const navigate = useNavigate();
+
+  const [role, setRole] =
+    useState<UserRole | null>(null);
+
+  useEffect(() => {
+    const fetchRole = async () => {
+      try {
+        const { data } =
+          await api.get('/auth/me');
+
+        setRole(data.role);
+
+      } catch {
+        setRole(null);
+      }
+    };
+
+    fetchRole();
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -37,40 +62,51 @@ const Navbar = () => {
 
           {/* Navigation Links */}
           <div className="flex items-center space-x-8">
-            
-            {/* NEW: Leaderboard Link */}
-            <Link 
-              to="/leaderboard" 
-              className="flex items-center space-x-2 text-slate-600 hover:text-slate-900 transition-colors duration-200 font-medium text-sm"
+            <Link
+              to="/leaderboard"
+              className="flex items-center space-x-2 text-slate-600 hover:text-slate-900 font-medium text-sm"
             >
               <Trophy className="w-4 h-4" />
               <span>Leaderboard</span>
             </Link>
 
-            {/* Dashboard Link */}
-            <Link 
-              to="/dashboard"
-              className="flex items-center space-x-2 text-slate-600 hover:text-slate-900 transition-colors duration-200 font-medium text-sm"
-            >
-              <LayoutDashboard className="w-4 h-4" />
-              <span>Dashboard</span>
-            </Link>
-            <Link
-              to="/join-team"
-              className="flex items-center space-x-2 text-slate-600 hover:text-slate-900 transition-colors duration-200 font-medium text-sm"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>Join Team</span>
-            </Link>
-            
-            {/* Logout Button */}
-            <button 
-              onClick={handleLogout} 
-              className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-900 text-white px-5 py-2.5 rounded-full transition-all duration-200 hover:shadow-lg text-sm font-medium"
+            {(role === 'mentor' ||
+              role === 'admin') ? (
+              <Link
+                to="/judge"
+                className="flex items-center space-x-2 text-purple-600 hover:text-purple-800 font-semibold text-sm"
+              >
+                {/* <Award className="w-4 h-4" /> */}
+                <span>Mentor Dashboard</span>
+              </Link>
+            ) : (
+              <>
+                <Link
+                  to="/dashboard"
+                  className="flex items-center space-x-2 text-slate-600 hover:text-slate-900 font-medium text-sm"
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span>Dashboard</span>
+                </Link>
+
+                <Link
+                  to="/join-team"
+                  className="flex items-center space-x-2 text-slate-600 hover:text-slate-900 font-medium text-sm"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>Join Team</span>
+                </Link>
+              </>
+            )}
+
+            <button
+              onClick={handleLogout}
+              className="..."
             >
               <LogOut className="w-4 h-4" />
               <span>Logout</span>
             </button>
+
           </div>
         </div>
       </div>

@@ -1,10 +1,46 @@
 import express from 'express';
-import { submitScore, getLeaderboard } from '../controllers/scoreController.js';
-import { protect, authorize } from '../middleware/auth.middleware.js';
+
+import {
+  addScore,
+  getLeaderboard,
+  getMyScores,
+} from '../controllers/scoreController.js';
+
+import {
+  protect,
+  authorize,
+} from '../middleware/auth.middleware.js';
+
 import { UserRole } from '../models/user.model.js';
-import { addScore } from '../controllers/scoreController.js';
+
 const router = express.Router();
-router.post('/submit', protect, authorize(UserRole.ADMIN), submitScore);
-router.get('/leaderboard', getLeaderboard);
-router.post('/add', protect, addScore);
+
+// Public leaderboard
+router.get(
+  '/leaderboard',
+  getLeaderboard
+);
+
+// Mentor/Admin scoring
+router.post(
+  '/add',
+  protect,
+  authorize(
+    UserRole.MENTOR,
+    UserRole.ADMIN
+  ),
+  addScore
+);
+
+// Scores given by the currently logged-in mentor
+router.get(
+  '/mine',
+  protect,
+  authorize(
+    UserRole.MENTOR,
+    UserRole.ADMIN
+  ),
+  getMyScores
+);
+
 export default router;

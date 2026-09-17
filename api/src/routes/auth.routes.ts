@@ -1,8 +1,19 @@
-import express from 'express';
-import { githubLogin, githubCallback, logout } from '../controllers/authController.js';
+import {
+  githubLogin,
+  githubCallback,
+  logout,
+  getCurrentUser,
+} from '../controllers/authController.js';
+
+import { protect } from '../middleware/auth.middleware.js';
+import express from "express";
 
 const router = express.Router();
-
+router.get(
+  '/me',
+  protect,
+  getCurrentUser
+);
 // 1. Route to initiate GitHub OAuth
 // The frontend will link to this URL (e.g., <a href="http://localhost:5000/api/auth/github">Login</a>)
 router.get('/github', githubLogin);

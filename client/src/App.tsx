@@ -7,6 +7,8 @@ import KanbanBoard from './pages/KanbanBoard';
 import Leaderboard from './pages/Leaderboard';
 import JudgeDashboard from './pages/JudgesDashboard';
 import JoinTeams from './pages/JoinTeams';
+import RoleDashboard from './pages/RoleDashboard';
+// import MentorDashboard from './pages/MentorDashboard';
 function App() {
   return (
     <Router>
@@ -14,6 +16,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/dashboard" element={<RoleDashboard />}/>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/kanban/:teamId" element={<KanbanBoard />} />
         <Route path="/leaderboard" element={<Leaderboard />} />

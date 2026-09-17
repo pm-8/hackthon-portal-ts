@@ -6,10 +6,26 @@ import {
   getMyTeam, 
   getAllTeams 
 } from '../controllers/teamController.js';
-import { protect } from '../middleware/auth.middleware.js';
+import {
+  protect,
+  authorize,
+} from '../middleware/auth.middleware.js';
+
+import {
+  UserRole,
+} from '../models/user.model.js';
 
 const router = express.Router();
 
+router.get(
+  '/all',
+  protect,
+  authorize(
+    UserRole.MENTOR,
+    UserRole.ADMIN
+  ),
+  getAllTeams
+);
 // All team routes require the user to be logged in, so we use the 'protect' middleware!
 
 // 1. Get the current user's team (must come BEFORE /:teamId so it doesn't confuse 'my-team' with an ID)
