@@ -135,13 +135,39 @@ const Dashboard = () => {
     }
   };
 
-  const handleAccept = async (inviteId: string) => {
+  const handleAccept = async (
+    inviteId: string
+  ) => {
     try {
-      await api.post('/invites/respond', { inviteId, status: 'accepted' });
-      toast.success("Joined team successfully! 🎉");
-      window.location.reload(); 
+      const { data } =
+        await api.post(
+          '/invites/respond',
+          {
+            inviteId,
+            status: 'accepted',
+          }
+        );
+
+      if (
+        data.githubAccess ===
+        'invited'
+      ) {
+        toast.success(
+          'Joined the team. GitHub sent you a repository invitation — accept it on GitHub to get push access.'
+        );
+      } else {
+        toast.success(
+          'Joined team and GitHub access is active! 🎉'
+        );
+      }
+
+      window.location.reload();
+
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to accept invite');
+      toast.error(
+        error.response?.data?.error ||
+          'Failed to accept invite'
+      );
     }
   };
 

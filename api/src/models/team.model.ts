@@ -1,15 +1,15 @@
 import mongoose, { Schema, Document, Types } from 'mongoose';
 export interface ITeam extends Document {
   teamName: string;
-  teamMembers: Types.ObjectId[]; 
+  teamMembers: Types.ObjectId[];
   teamLeader: Types.ObjectId;
   githubRepo: string;
   githubConnected: boolean;
-  githubInstallationId: Number;
-  githubRepoId: Number;
-  githubOwner: string;
-  githubRepoName: string;
-  githubConnectedAt: Date;
+  githubInstallationId: number | null;
+  githubRepoId: number | null;
+  githubOwner: string | null;
+  githubRepoName: string | null;
+  githubConnectedAt: Date | null;
   commits: Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;

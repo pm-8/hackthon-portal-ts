@@ -5,7 +5,9 @@ import User from '../models/user.model.js';
 import Commit from '../models/commit.model.js';
 import { parseGitHubRepoUrl,addRepositoryCollaborator } from '../utils/github.util.js';
 import { type AuthRequest } from '../middleware/auth.middleware.js';
-
+import {
+  getOrCreateHackathon,
+} from '../utils/hackathon.util.js';
 export const createTeam = async (
   req: AuthRequest,
   res: Response

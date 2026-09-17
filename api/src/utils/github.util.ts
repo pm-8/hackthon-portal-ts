@@ -106,27 +106,40 @@ export const addRepositoryCollaborator = async (
   repo: string,
   username: string
 ) => {
+  if (!username) {
+    throw new Error('GitHub username is required');
+  }
+
   const installationToken =
     await createInstallationAccessToken(
       installationId
     );
 
-  const response = await axios.put(
-    `https://api.github.com/repos/${owner}/${repo}/collaborators/${encodeURIComponent(username)}`,
-    {},
-    {
-      headers: {
-        Authorization: `Bearer ${installationToken}`,
-        Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2026-03-10',
-      },
-    }
-  );
+  const url =
+    `https://api.github.com/repos/${owner}/${repo}` +
+    `/collaborators/${encodeURIComponent(username)}`;
+
+  const response = await axios.request({
+    method: 'PUT',
+    url,
+    headers: {
+      Authorization: `Bearer ${installationToken}`,
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2026-03-10',
+
+      // GitHub recommends Content-Length: 0
+      // when no request body/permission parameter is sent.
+      'Content-Length': '0',
+    },
+  });
 
   return {
     status: response.status,
-    invited:
-      response.status === 201,
+
+    // New invitation created
+    invited: response.status === 201,
+
+    // Already collaborator / directly added
     alreadyCollaborator:
       response.status === 204,
   };

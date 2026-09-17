@@ -28,7 +28,11 @@ interface Team {
   githubRepo: string;
   teamMembers: TeamMember[];
 }
-
+interface JoinTeamResponse {
+  team: Team;
+  githubAccess: 'added' | 'invited';
+  message: string;
+}
 const JoinTeams = () => {
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,33 +57,57 @@ const JoinTeams = () => {
     fetchTeams();
   }, []);
 
-  const handleJoinTeam = async (teamId: string) => {
+  const handleJoinTeam = async (
+    teamId: string
+  ) => {
     try {
       setJoiningTeamId(teamId);
 
-      const { data } = await api.post<Team>(
-        `/teams/${teamId}/join`
+      const { data } =
+        await api.post<JoinTeamResponse>(
+          `/teams/${teamId}/join`
+        );
+
+      if (
+        data.githubAccess ===
+        'invited'
+      ) {
+        toast.success(
+          'You joined the team. GitHub sent you a repository invitation — accept it on GitHub to get push access.'
+        );
+      } else {
+        toast.success(
+          'You joined the team and GitHub access is active! 🎉'
+        );
+      }
+
+      setTeams((prev) =>
+        prev.filter(
+          (team) =>
+            team._id !== teamId
+        )
       );
 
-      toast.success(`You joined ${data.teamName}! 🎉`);
+      setTimeout(() => {
+        window.location.href =
+          '/dashboard';
+      }, 700);
 
-      // Remove joined team from the available list.
-      setTeams((prev) => prev.filter((team) => team._id !== teamId));
-
-      // Send user to dashboard.
-      window.location.href = '/dashboard';
     } catch (error: any) {
-      console.error('Failed to join team:', error);
+      console.error(
+        'Failed to join team:',
+        error
+      );
 
       toast.error(
         error.response?.data?.error ||
           'Failed to join team'
       );
+
     } finally {
       setJoiningTeamId(null);
     }
   };
-
   const filteredTeams = teams.filter((team) =>
     team.teamName.toLowerCase().includes(search.toLowerCase())
   );
